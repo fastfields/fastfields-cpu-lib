@@ -17,13 +17,24 @@ namespace cpu {
  * inp[...,c]`; with only `membrane`, it is `membrane[c]` times the discrete
  * negative Laplacian of channel `c`.
  *
- * @throws std::invalid_argument if `bending` is given together with a
- *         `Replicate`, `DCT1` or `DST1` boundary. A reach-2 stencil's boundary
- *         fold is not involutive under those three, so the assembled operator
- *         would not be self-adjoint and CG / relaxation would have no valid
- *         problem to solve. Validated once per call, never per voxel. Zero,
- *         DCT2, DST2, DFT and NoCheck are fully supported; `absolute` and
- *         `membrane` are reach-1 and accepted under every condition.
+ * @throws std::invalid_argument if the selected energy is not self-adjoint
+ *         under `bound`. The stencil's boundary fold has to be an involution on
+ *         the tap set, and more reach folds more taps, so the answer depends on
+ *         which penalty is highest-order:
+ *
+ *             bound      | absolute | membrane | bending
+ *             -----------+----------+----------+---------
+ *             Replicate  |    ok    |    ok    | REJECT
+ *             DCT1       |    ok    |  REJECT  | REJECT
+ *             all others |    ok    |    ok    |   ok
+ *
+ *         DCT1 reflects about the last inbound voxel, so at x=0 the -1 tap
+ *         lands on the +1 tap and the operator loses symmetry from reach 1
+ *         upwards; Replicate's clamp only bites once a +-2 tap exists.
+ *         `absolute` reads no neighbour at all and is accepted everywhere. The
+ *         rejection set is measured (assembled `A`, `max|A-A^T|/max|A|`), lives
+ *         in `bound::supports_{absolute,membrane,bending}`, and is validated
+ *         ONCE per call, never per voxel.
  *
  * @param out         Output tensor (*batch, *spatial, C)
  * @param inp         Input  tensor (*batch, *spatial, C)
