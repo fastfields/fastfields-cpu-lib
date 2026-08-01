@@ -777,7 +777,7 @@ void field_matvec(
 /**
  * @brief `field_matvec` variant that accumulates: `out += L(inp)`.
  */
-void field_matvec_add_(
+void field_addmatvec_(
           DLTensor & out_      ,
     const DLTensor & inp_      ,
     const double   * voxel_size,
@@ -819,7 +819,7 @@ void field_matvec_add_(
 /**
  * @brief `field_matvec` variant that subtracts: `out -= L(inp)`.
  */
-void field_matvec_sub_(
+void field_submatvec_(
           DLTensor & out_      ,
     const DLTensor & inp_      ,
     const double   * voxel_size,
@@ -899,7 +899,7 @@ void field_diag(
  * caller owns `out` and this reads-modifies-writes it. An out-of-place
  * "return a fresh tensor" form is a caller-side clone, not a second kernel.
  */
-void field_diag_add_(
+void field_adddiag_(
           DLTensor & out_      ,
     const double   * voxel_size,
     const double   * absolute  ,
@@ -936,7 +936,7 @@ void field_diag_add_(
 /**
  * @brief `field_diag` variant that subtracts: `out -= diag(L)`. In-place only.
  */
-void field_diag_sub_(
+void field_subdiag_(
           DLTensor & out_      ,
     const double   * voxel_size,
     const double   * absolute  ,
@@ -1008,7 +1008,7 @@ void field_kernel(
  * @brief `field_kernel` variant that accumulates the stencil: `out += K`.
  *        In-place only (jitfields `op='+'`).
  */
-void field_kernel_add_(
+void field_addkernel_(
           DLTensor & out_      ,
     const double   * voxel_size,
     const double   * absolute  ,
@@ -1046,7 +1046,7 @@ void field_kernel_add_(
  * @brief `field_kernel` variant that subtracts the stencil: `out -= K`.
  *        In-place only (jitfields `op='-'`).
  */
-void field_kernel_sub_(
+void field_subkernel_(
           DLTensor & out_      ,
     const double   * voxel_size,
     const double   * absolute  ,
@@ -1132,7 +1132,7 @@ void field_forward(
           int        stream    )
 {
     sym_matvec(out, hes, inp, stream);
-    field_matvec_add_(out, inp, voxel_size, absolute, membrane, bending, bound, ndim, stream);
+    field_addmatvec_(out, inp, voxel_size, absolute, membrane, bending, bound, ndim, stream);
 }
 
 // `field_diag`'s regulariser diagonal doesn't depend on the operand being

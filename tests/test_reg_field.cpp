@@ -494,7 +494,7 @@ void run_2d_relax_rls(int64_t Hgt, int64_t W, int64_t C, int64_t wc,
     check_close(rel, 0.0, buf, 3e-3);
 }
 
-// field_matvec_add_/field_matvec_sub_ must reproduce out (+/-)= field_matvec(inp)
+// field_addmatvec_/field_submatvec_ must reproduce out (+/-)= field_matvec(inp)
 // against a nonzero pre-existing out buffer.
 template <typename scalar_t>
 void run_2d_matvec_addsub(int64_t Hgt, int64_t W, int64_t C, int order,
@@ -525,16 +525,16 @@ void run_2d_matvec_addsub(int64_t Hgt, int64_t W, int64_t C, int order,
     DLTensor tacc_sub = make_cpu_tensor(acc_sub.data(), fshape, fstr, bits);
 
     ff::cpu::field_matvec(tLx, tx, nullptr, ap, mp, bp, (int8_t)bound, 2, 0);
-    ff::cpu::field_matvec_add_(tacc_add, tx, nullptr, ap, mp, bp, (int8_t)bound, 2, 0);
-    ff::cpu::field_matvec_sub_(tacc_sub, tx, nullptr, ap, mp, bp, (int8_t)bound, 2, 0);
+    ff::cpu::field_addmatvec_(tacc_add, tx, nullptr, ap, mp, bp, (int8_t)bound, 2, 0);
+    ff::cpu::field_submatvec_(tacc_sub, tx, nullptr, ap, mp, bp, (int8_t)bound, 2, 0);
 
     for (int64_t i = 0; i < fnum; ++i) {
-        check_close((double)acc_add[i], (double)base[i] + (double)Lx[i], "field2d_matvec_add");
-        check_close((double)acc_sub[i], (double)base[i] - (double)Lx[i], "field2d_matvec_sub");
+        check_close((double)acc_add[i], (double)base[i] + (double)Lx[i], "field2d_addmatvec");
+        check_close((double)acc_sub[i], (double)base[i] - (double)Lx[i], "field2d_submatvec");
     }
 }
 
-// field_diag_add_/_sub and field_kernel_add_/_sub must reproduce
+// field_adddiag_/_sub and field_addkernel_/_sub must reproduce
 // out (+/-)= field_diag(...) / field_kernel(...) against a nonzero pre-existing
 // out buffer. These are the in-place-only accumulate entry points restored from
 // jitfields (op '+' / '-'); the '=' path is field_diag / field_kernel.
@@ -566,12 +566,12 @@ void run_2d_diag_kernel_addsub(int64_t Hgt, int64_t W, int64_t C, int order,
         DLTensor ts  = make_cpu_tensor(acc_sub.data(), fshape, fstr, bits);
 
         ff::cpu::field_diag    (tD, nullptr, ap, mp, bp, (int8_t)bound, 2, 0);
-        ff::cpu::field_diag_add_(ta, nullptr, ap, mp, bp, (int8_t)bound, 2, 0);
-        ff::cpu::field_diag_sub_(ts, nullptr, ap, mp, bp, (int8_t)bound, 2, 0);
+        ff::cpu::field_adddiag_(ta, nullptr, ap, mp, bp, (int8_t)bound, 2, 0);
+        ff::cpu::field_subdiag_(ts, nullptr, ap, mp, bp, (int8_t)bound, 2, 0);
 
         for (int64_t i = 0; i < fnum; ++i) {
-            check_close((double)acc_add[i], (double)base[i] + (double)D[i], "field2d_diag_add");
-            check_close((double)acc_sub[i], (double)base[i] - (double)D[i], "field2d_diag_sub");
+            check_close((double)acc_add[i], (double)base[i] + (double)D[i], "field2d_adddiag");
+            check_close((double)acc_sub[i], (double)base[i] - (double)D[i], "field2d_subdiag");
         }
     }
 
@@ -588,12 +588,12 @@ void run_2d_diag_kernel_addsub(int64_t Hgt, int64_t W, int64_t C, int order,
         DLTensor ts = make_cpu_tensor(acc_sub.data(), fshape, fstr, bits);
 
         ff::cpu::field_kernel    (tK, nullptr, ap, mp, bp, (int8_t)bound, 2, 0);
-        ff::cpu::field_kernel_add_(ta, nullptr, ap, mp, bp, (int8_t)bound, 2, 0);
-        ff::cpu::field_kernel_sub_(ts, nullptr, ap, mp, bp, (int8_t)bound, 2, 0);
+        ff::cpu::field_addkernel_(ta, nullptr, ap, mp, bp, (int8_t)bound, 2, 0);
+        ff::cpu::field_subkernel_(ts, nullptr, ap, mp, bp, (int8_t)bound, 2, 0);
 
         for (int64_t i = 0; i < fnum; ++i) {
-            check_close((double)acc_add[i], (double)base[i] + (double)K[i], "field2d_kernel_add");
-            check_close((double)acc_sub[i], (double)base[i] - (double)K[i], "field2d_kernel_sub");
+            check_close((double)acc_add[i], (double)base[i] + (double)K[i], "field2d_addkernel");
+            check_close((double)acc_sub[i], (double)base[i] - (double)K[i], "field2d_subkernel");
         }
     }
 }
@@ -744,7 +744,7 @@ int main()
     run_2d_relax<double>(6, 7, 2, 8.0, 3, {0.3, 0.4}, {0.5, 0.6},
                          {1.0, 0.8}, 64);
 
-    // field_matvec_add_ / field_matvec_sub_: accumulate/subtract into a
+    // field_addmatvec_ / field_submatvec_: accumulate/subtract into a
     // pre-existing out buffer instead of overwriting it.
     for (int bnd : {B_ZERO, B_DCT2, B_DFT}) {
         run_2d_matvec_addsub<double>(5, 6, 2, 1, {1.75, 0.9}, {0, 0}, {0, 0}, 64, bnd);
@@ -753,7 +753,7 @@ int main()
     }
     run_2d_matvec_addsub<float>(5, 5, 2, 2, {0.3, 0.4}, {1.0, 0.7}, {0, 0}, 32);
 
-    // field_diag_add_/_sub, field_kernel_add_/_sub: accumulate/subtract into a
+    // field_adddiag_/_sub, field_addkernel_/_sub: accumulate/subtract into a
     // pre-existing out buffer instead of overwriting it (jitfields op '+'/'-').
     for (int bnd : {B_ZERO, B_DCT2, B_DFT}) {
         run_2d_diag_kernel_addsub<double>(5, 6, 2, 1, {1.75, 0.9}, {0, 0}, {0, 0}, 64, bnd);

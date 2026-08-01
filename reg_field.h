@@ -43,7 +43,7 @@ void field_matvec(
  * @brief `field_matvec` variant that accumulates into `out`: `out += L(inp)`,
  *        instead of overwriting it. Same conventions otherwise.
  */
-void field_matvec_add_(
+void field_addmatvec_(
           DLTensor & out       ,
     const DLTensor & inp       ,
     const double   * voxel_size = nullptr,
@@ -59,7 +59,7 @@ void field_matvec_add_(
  * @brief `field_matvec` variant that subtracts from `out`: `out -= L(inp)`,
  *        instead of overwriting it. Same conventions otherwise.
  */
-void field_matvec_sub_(
+void field_submatvec_(
           DLTensor & out       ,
     const DLTensor & inp       ,
     const double   * voxel_size = nullptr,
@@ -95,7 +95,7 @@ void field_diag(
  * entry point. There is deliberately no out-of-place counterpart: an
  * out-of-place accumulate is a caller-side clone followed by this same call.
  */
-void field_diag_add_(
+void field_adddiag_(
           DLTensor & out       ,
     const double   * voxel_size = nullptr,
     const double   * absolute  = nullptr,
@@ -114,7 +114,7 @@ void field_diag_add_(
  * entry point. There is deliberately no out-of-place counterpart: an
  * out-of-place accumulate is a caller-side clone followed by this same call.
  */
-void field_diag_sub_(
+void field_subdiag_(
           DLTensor & out       ,
     const double   * voxel_size = nullptr,
     const double   * absolute  = nullptr,
@@ -164,7 +164,7 @@ void field_kernel(
  * entry point. There is deliberately no out-of-place counterpart: an
  * out-of-place accumulate is a caller-side clone followed by this same call.
  */
-void field_kernel_add_(
+void field_addkernel_(
           DLTensor & out       ,
     const double   * voxel_size = nullptr,
     const double   * absolute  = nullptr,
@@ -183,7 +183,7 @@ void field_kernel_add_(
  * entry point. There is deliberately no out-of-place counterpart: an
  * out-of-place accumulate is a caller-side clone followed by this same call.
  */
-void field_kernel_sub_(
+void field_subkernel_(
           DLTensor & out       ,
     const double   * voxel_size = nullptr,
     const double   * absolute  = nullptr,
