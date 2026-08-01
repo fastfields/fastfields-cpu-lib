@@ -20,7 +20,8 @@
 
 namespace {
 
-enum { B_ZERO = 0, B_DCT2 = 3, B_DST2 = 5 };
+enum { B_ZERO = 0, B_REPLICATE = 1, B_DCT1 = 2, B_DCT2 = 3,
+       B_DST1 = 4, B_DST2 = 5, B_DFT = 6, B_NOCHECK = 7 };
 
 template <typename T>
 DLTensor make_cpu_tensor(T* data, std::vector<int64_t>& shape,
@@ -330,6 +331,103 @@ void test_diag_boundary_symmetry_2d()
         check_close(at(0, j), at(j, 0), "diag_bending.boundary_symmetry_2d");
 }
 
+// --- bending boundary validation (fastfields-kernels#50 decision 2) --------
+//
+// A reach-2 stencil is not self-adjoint under Replicate / DCT1 / DST1, so a
+// bending call under one of those must be REJECTED at the dispatch entry rather
+// than silently return an asymmetric operator for CG to diverge on. Checked once
+// per call, not per voxel. Every other condition stays fully supported, and
+// reach-1 energies (absolute / membrane) are unaffected under all eight.
+//
+// `field_kernel` is deliberately exempt: it materialises the interior Toeplitz
+// stencil at pure strides and never consults the boundary.
+
+bool matvec_throws(int bound, bool with_bending)
+{
+    const int64_t N = 8, C = 1;
+    std::vector<double> inp(N*C, 0.0), out(N*C, 0.0);
+    std::vector<double> absolute(C, 0.1), membrane(C, 0.3), bending(C, 1.0);
+    std::vector<int64_t> sh = {N, C}, st = contiguous_strides(sh);
+    DLTensor ti = make_cpu_tensor(inp.data(), sh, st, 64);
+    DLTensor to = make_cpu_tensor(out.data(), sh, st, 64);
+    try {
+        ff::cpu::field_matvec(to, ti, nullptr, absolute.data(), membrane.data(),
+                              with_bending ? bending.data() : nullptr,
+                              (int8_t)bound, 1, 0);
+    } catch (const std::exception&) { return true; }
+    return false;
+}
+
+bool diag_throws(int bound, bool with_bending)
+{
+    const int64_t N = 8, C = 1;
+    std::vector<double> out(N*C, 0.0);
+    std::vector<double> absolute(C, 0.1), membrane(C, 0.3), bending(C, 1.0);
+    std::vector<int64_t> sh = {N, C}, st = contiguous_strides(sh);
+    DLTensor to = make_cpu_tensor(out.data(), sh, st, 64);
+    try {
+        ff::cpu::field_diag(to, nullptr, absolute.data(), membrane.data(),
+                            with_bending ? bending.data() : nullptr,
+                            (int8_t)bound, 1, 0);
+    } catch (const std::exception&) { return true; }
+    return false;
+}
+
+bool kernel_throws(int bound)
+{
+    const int64_t kd = 5, C = 1;
+    std::vector<double> K(kd*C, 0.0);
+    std::vector<double> absolute(C, 0.1), membrane(C, 0.3), bending(C, 1.0);
+    std::vector<int64_t> sh = {kd, C}, st = contiguous_strides(sh);
+    DLTensor tK = make_cpu_tensor(K.data(), sh, st, 64);
+    try {
+        ff::cpu::field_kernel(tK, nullptr, absolute.data(), membrane.data(),
+                              bending.data(), (int8_t)bound, 1, 0);
+    } catch (const std::exception&) { return true; }
+    return false;
+}
+
+void expect(bool got, bool want, const char* what)
+{
+    ++g_checks;
+    if (got != want) {
+        ++g_failures;
+        std::printf("  FAIL [%s]: threw=%d expected=%d\n", what, (int)got, (int)want);
+    }
+}
+
+void test_bending_bound_validation()
+{
+    struct { int b; const char* name; bool ok; } B[] = {
+        {B_ZERO,      "Zero",      true },
+        {B_REPLICATE, "Replicate", false},
+        {B_DCT1,      "DCT1",      false},
+        {B_DCT2,      "DCT2",      true },
+        {B_DST1,      "DST1",      false},
+        {B_DST2,      "DST2",      true },
+        {B_DFT,       "DFT",       true },
+        {B_NOCHECK,   "NoCheck",   true },
+    };
+    char buf[96];
+    for (const auto& b : B) {
+        // bending active -> the three non-self-adjoint conditions must throw
+        std::snprintf(buf, sizeof(buf), "field_matvec.bending.%s", b.name);
+        expect(matvec_throws(b.b, true), !b.ok, buf);
+        std::snprintf(buf, sizeof(buf), "field_diag.bending.%s", b.name);
+        expect(diag_throws(b.b, true), !b.ok, buf);
+
+        // membrane only -> reach 1, never rejected, under ANY condition
+        std::snprintf(buf, sizeof(buf), "field_matvec.membrane.%s", b.name);
+        expect(matvec_throws(b.b, false), false, buf);
+        std::snprintf(buf, sizeof(buf), "field_diag.membrane.%s", b.name);
+        expect(diag_throws(b.b, false), false, buf);
+
+        // field_kernel materialises a boundary-independent stencil -> never rejected
+        std::snprintf(buf, sizeof(buf), "field_kernel.bending.%s", b.name);
+        expect(kernel_throws(b.b), false, buf);
+    }
+}
+
 } // namespace
 
 int main()
@@ -377,6 +475,9 @@ int main()
 
     // diag_bending boundary cross-term regression (issue: corner-weight bug)
     test_diag_boundary_symmetry_2d();
+
+    // bending under Replicate/DCT1/DST1 must be rejected, not silently applied
+    test_bending_bound_validation();
 
     std::printf("checks: %d, failures: %d\n", g_checks, g_failures);
     if (g_failures) { std::printf("FAILED\n"); return 1; }

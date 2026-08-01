@@ -17,6 +17,14 @@ namespace cpu {
  * inp[...,c]`; with only `membrane`, it is `membrane[c]` times the discrete
  * negative Laplacian of channel `c`.
  *
+ * @throws std::invalid_argument if `bending` is given together with a
+ *         `Replicate`, `DCT1` or `DST1` boundary. A reach-2 stencil's boundary
+ *         fold is not involutive under those three, so the assembled operator
+ *         would not be self-adjoint and CG / relaxation would have no valid
+ *         problem to solve. Validated once per call, never per voxel. Zero,
+ *         DCT2, DST2, DFT and NoCheck are fully supported; `absolute` and
+ *         `membrane` are reach-1 and accepted under every condition.
+ *
  * @param out         Output tensor (*batch, *spatial, C)
  * @param inp         Input  tensor (*batch, *spatial, C)
  * @param voxel_size  [ndim] spatial voxel size (nullptr -> all ones)
@@ -40,8 +48,15 @@ void field_matvec(
 );
 
 /**
- * @brief Diagonal (preconditioner) of the regulariser operator, same
- *        conventions as `field_matvec`. Writes into `out` (*batch, *spatial, C).
+ * @brief Diagonal of the regulariser operator, same conventions as
+ *        `field_matvec`. Writes into `out` (*batch, *spatial, C).
+ *
+ * This is the EXACT matrix diagonal at every voxel, boundary voxels included --
+ * i.e. exactly what `field_matvec` returns when contracted against a unit
+ * vector -- not an interior-only approximation extended to the edges.
+ *
+ * @throws std::invalid_argument on the same bending/boundary combinations as
+ *         `field_matvec`.
  */
 void field_diag(
           DLTensor & out       ,
@@ -63,6 +78,10 @@ void field_diag(
  * `(*batch, *spatial, C)` (the field regulariser never couples channels). The
  * spatial extent must be at least the stencil width in every spatial dim
  * (1 if absolute-only, 3 if membrane, 5 if bending) and is centred.
+ *
+ * Unlike `field_matvec` / `field_diag` this never rejects a bending + boundary
+ * combination: the stencil is written at pure strides and does not consult the
+ * boundary at all, so there is a well-defined answer for every condition.
  *
  * @param out         Output stencil (*batch, *spatial, C)
  * @param voxel_size  [ndim] spatial voxel size (nullptr -> all ones)
