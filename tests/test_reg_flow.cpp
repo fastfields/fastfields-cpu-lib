@@ -701,6 +701,61 @@ void run_2d_forward(int64_t Hgt, int64_t W, double absolute, double membrane,
         check_close((double)out[i], (double)Hx[i] + (double)Lx[i], "flow2d_forward");
 }
 
+// Regression test for a fixed cross-corner-term bug in flow's 2D diag_bending
+// / diag_all boundary correction: the corner weight was multiplied by
+// (fx0*fy0 + fx1*fy0 + fx1*fy0 + fx1*fy1) -- fx1*fy0 counted twice, fx0*fy1
+// dropped. On a SQUARE domain with the SAME boundary condition on every axis,
+// bending alone (shears=div=0) treats every channel independently and the
+// per-channel operator must be symmetric under swapping axes, so
+// diag(x=0,y=j,c) must equal diag(x=j,y=0,c) for every j,c. The buggy corner
+// sum is asymmetric under fx<->fy relabelling away from a fully-symmetric
+// corner, so this needs no independent reference implementation to catch it.
+void test_diag_boundary_symmetry_2d_bending()
+{
+    const int64_t N = 6, C = 2;
+    std::vector<int64_t> shape = {N, N, C};
+    std::vector<int64_t> str   = contiguous_strides(shape);
+    std::vector<double> out(N * N * C, 0.0);
+    DLTensor tout = make_cpu_tensor(out.data(), shape, str, 64);
+
+    ff::cpu::flow_diag(tout, nullptr, /*absolute*/0.1, /*membrane*/0.3,
+                       /*bending*/1.0, /*shears*/0.0, /*div*/0.0,
+                       (int8_t)B_DST2, 2, 0);
+
+    auto at = [&](int64_t x, int64_t y, int64_t c) {
+        return out[(x * N + y) * C + c];
+    };
+    for (int64_t j = 0; j < N; ++j)
+        for (int64_t c = 0; c < C; ++c)
+            check_close(at(0, j, c), at(j, 0, c),
+                        "flow2d_diag_bending.boundary_symmetry");
+}
+
+// Same bug, via the diag_all path (bending AND shears/div all nonzero, i.e.
+// the combined Lame+bending stencil). With shears == div the Lame terms are
+// themselves symmetric under simultaneous axis-swap + channel-swap, so the
+// square-domain diagonal must satisfy diag(0,j,c) == diag(j,0,1-c).
+void test_diag_boundary_symmetry_2d_all()
+{
+    const int64_t N = 6, C = 2;
+    std::vector<int64_t> shape = {N, N, C};
+    std::vector<int64_t> str   = contiguous_strides(shape);
+    std::vector<double> out(N * N * C, 0.0);
+    DLTensor tout = make_cpu_tensor(out.data(), shape, str, 64);
+
+    ff::cpu::flow_diag(tout, nullptr, /*absolute*/0.1, /*membrane*/0.3,
+                       /*bending*/1.0, /*shears*/0.7, /*div*/0.7,
+                       (int8_t)B_DST2, 2, 0);
+
+    auto at = [&](int64_t x, int64_t y, int64_t c) {
+        return out[(x * N + y) * C + c];
+    };
+    for (int64_t j = 0; j < N; ++j)
+        for (int64_t c = 0; c < C; ++c)
+            check_close(at(0, j, c), at(j, 0, 1 - c),
+                        "flow2d_diag_all.boundary_symmetry");
+}
+
 } // namespace
 
 int main()
@@ -870,6 +925,10 @@ int main()
         run_2d_forward<double>(6, 7, 0.3, 0.7, 0.0, 1.0, 0.5, 64, bnd);  // all
     }
     run_2d_forward<float>(6, 6, 0.5, 1.0, 0.0, 0.0, 0.0, 32);
+
+    // diag_bending / diag_all boundary cross-term regression (corner-weight bug)
+    test_diag_boundary_symmetry_2d_bending();
+    test_diag_boundary_symmetry_2d_all();
 
     std::printf("checks: %d, failures: %d\n", g_checks, g_failures);
     if (g_failures) { std::printf("FAILED\n"); return 1; }
