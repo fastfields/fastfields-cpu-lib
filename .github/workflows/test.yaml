@@ -69,6 +69,13 @@ jobs:
           token: ${{ secrets.CI_SUBMODULE_TOKEN }}
       - name: Install build toolchain
         run: sudo apt-get update && sudo apt-get install -y clang ccache
+      # apt's ccache (4.x) defaults CCACHE_DIR to ~/.cache/ccache (XDG), not
+      # the legacy ~/.ccache -- pin it explicitly so the actions/cache path
+      # below actually matches where ccache reads/writes. Without this, the
+      # cache save step silently no-ops ("Path(s) ... do not exist") and every
+      # run stays cold; caught by inspecting a real run's logs.
+      - name: Set CCACHE_DIR
+        run: echo "CCACHE_DIR=$HOME/.ccache" >> "$GITHUB_ENV"
       # Keyed per matrix leg (bounds/splineflags select different object-file
       # content) plus a source hash, so a source-only push still reuses the
       # previous run's ccache dir via the restore-keys prefix fallback --
