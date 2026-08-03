@@ -1222,10 +1222,10 @@ static inline bool field_rls_is_jrls(const DLTensor & wgt, int64_t nc,
 {
     const int64_t wc = wgt.shape[wgt.ndim - 1];
     if (wc == nc) return false;
-    if (wc == 1)  return true;
-    throw std::invalid_argument(
-        std::string(who) + ": weight tensor's trailing dimension must be "
-        "1 (JRLS) or match the channel count (RLS)");
+    if (wc == 1) return true;
+    throw std::invalid_argument(std::string(who) +
+                                ": weight tensor's trailing dimension must be "
+                                "1 (JRLS) or match the channel count (RLS)");
 }
 
 void field_matvec_rls(
