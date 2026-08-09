@@ -1067,22 +1067,19 @@ int main()
             run_2d_rls_jrls_per_channel<double>(6, 7, 2, wc, 2, {0.3, 0.4},
                                                 {1.0, 0.7}, {0, 0}, 64, bnd);
         for (int64_t wc : {(int64_t)1, (int64_t)3})
-            run_2d_rls_jrls_per_channel<double>(7, 8, 3, wc, 2,
-                                                {0.3, 0.4, 0.2},
-                                                {1.0, 0.7, 1.2}, {0, 0, 0},
-                                                64, bnd);
+            run_2d_rls_jrls_per_channel<double>(7, 8, 3, wc, 2, {0.3, 0.4, 0.2},
+                                                {1.0, 0.7, 1.2}, {0, 0, 0}, 64,
+                                                bnd);
     }
     // bending order (Zero excluded, as for the symmetry/unit-weight suites
     // above -- separately-tracked OOB weight-map read at that boundary,
     // fastfields-kernels#34 finding S1).
     for (int bnd : {B_DCT2, B_DST2, B_DFT}) {
         for (int64_t wc : {(int64_t)1, (int64_t)2})
-            run_2d_rls_jrls_per_channel<double>(7, 8, 2, wc, 3, {0.3, 0.4},
-                                                {1.0, 0.7}, {1.1, 0.9}, 64,
-                                                bnd);
+            run_2d_rls_jrls_per_channel<double>(
+                7, 8, 2, wc, 3, {0.3, 0.4}, {1.0, 0.7}, {1.1, 0.9}, 64, bnd);
         for (int64_t wc : {(int64_t)1, (int64_t)3})
-            run_2d_rls_jrls_per_channel<double>(7, 8, 3, wc, 3,
-                                                {0.3, 0.4, 0.5},
+            run_2d_rls_jrls_per_channel<double>(7, 8, 3, wc, 3, {0.3, 0.4, 0.5},
                                                 {1.0, 0.7, 0.6},
                                                 {1.1, 0.9, 0.8}, 64, bnd);
     }
