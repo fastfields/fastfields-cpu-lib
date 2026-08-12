@@ -257,8 +257,13 @@ void field_cg(
     axpby_(p.t, z.t, 1.0, 0.0);             // p = z
     reduce_t rz = dot(r.t, z.t);
 
+    // `rz` is `<r, M^-1 r>`, which is strictly positive for as long as the
+    // preconditioner M = H + diag(L) is positive definite and `r` is non-zero.
+    // Zero means the residual vanished; negative means M is not positive
+    // definite, at which point CG's step lengths stop being descent steps --
+    // both are reasons to stop rather than to keep iterating.
     int it = 0;
-    while (it < nb_iter && rz != 0)
+    while (it < nb_iter && rz > 0)
     {
         field_forward(ap.t, hes, p.t, voxel_size, absolute, membrane, bending,
                       bound, ndim, stream);
